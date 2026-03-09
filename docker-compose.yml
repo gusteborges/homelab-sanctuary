@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine # Opcional: migrar do SQLite para Postgres no Proxmox
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=homelab
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=sua_senha_segura
+
+  backend:
+    build: ./back-end
+    volumes:
+      - ./back-end:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  frontend:
+    build: ./front-end
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
