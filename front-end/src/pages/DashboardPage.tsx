@@ -24,7 +24,7 @@ const DashboardPage = () => {
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/monitor/", {
+        const response = await fetch("http://192.168.100.100:8000/api/monitor/", {
           headers: { "Authorization": `Token ${token}` }
         });
         if (response.ok) {
@@ -37,7 +37,7 @@ const DashboardPage = () => {
     };
 
     fetchAllData();
-    const interval = setInterval(fetchAllData, 3000); // Atualiza tudo a cada 3s
+    const interval = setInterval(fetchAllData, 15000); // Atualiza tudo a cada 15s
     return () => clearInterval(interval);
   }, [token]);
 

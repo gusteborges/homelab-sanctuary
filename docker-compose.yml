@@ -2,29 +2,119 @@ version: '3.8'
 
 services:
   db:
-    image: postgres:15-alpine # Opcional: migrar do SQLite para Postgres no Proxmox
+    image: postgres:15-alpine
+    restart: always
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_DB=homelab
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=sua_senha_segura
+    env_file:
+      - ./back-end/.env
+    networks:
+      - homelab-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   backend:
     build: ./back-end
+    restart: always
     volumes:
       - ./back-end:/app
     ports:
       - "8000:8000"
+    env_file:
+      - ./back-end/.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - homelab-net
 
   frontend:
     build: ./front-end
+    restart: always
     ports:
       - "80:80"
     depends_on:
       - backend
+    networks:
+      - homelab-net
+
+  jellyfin:
+    image: jellyfin/jellyfin:10.7.7
+    container_name: jellyfin
+    privileged: true
+    restart: always
+    ports:
+      - "8096:8096"
+    volumes:
+      - ./jellyfin-config:/config
+      - ./jellyfin-cache:/cache
+      - /data/movies/filmes:/data/movies
+      - /data/movies/musicas:/data/music
+      - /data/movies/animes:/data/animes
+    networks:
+      - homelab-net
+
+  kavita:
+   image: jvmilazz0/kavita:0.8.1
+   container_name: kavita
+   restart: always
+   ports:
+     - "5000:5000"
+   volumes:
+     - ./kavita-config:/kavita/config
+     - /data/movies/books:/data
+   environment:
+     - TZ=America/Sao_Paulo
+     - PUID=1000
+     - PGID=1000
+   networks:
+     - homelab-net
+
+  gitea:
+    image: gitea/gitea:latest
+    container_name: gitea
+    restart: always
+    environment:
+      - USER_UID=1000
+      - USER_GID=1000
+      - GITEA__database__DB_TYPE=sqlite3
+    ports:
+      - "3000:3000"
+      - "222:22"
+    volumes:
+      - /root/homelab-sanctuary/gitea-data:/data
+    networks:
+      - homelab-net
+
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Sao_Paulo
+      - PASSWORD=9292
+      - SUDO_PASSWORD=9292
+    volumes:
+      - /root/homelab-sanctuary/code-server-config:/config
+      - /root/homelab-sanctuary/code-server-workspace:/workspace # Aqui é onde seus códigos vão ficar salvos de verdade
+    ports:
+      - "8443:8443"
+      - "3001:3000"
+      - "8080:8080" 
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    networks:
+      - homelab-net
+
+
+networks:
+  homelab-net:
+    driver: bridge
 
 volumes:
   postgres_data:

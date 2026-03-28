@@ -14,7 +14,7 @@ const ContainersPage = () => {
 
   const fetchContainers = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/containers/", {
+      const response = await fetch("http://192.168.100.100:8000/api/containers/", {
         headers: { "Authorization": `Token ${token}` }
       });
       if (response.ok) {
@@ -32,7 +32,7 @@ const ContainersPage = () => {
   const handleAction = async (containerId: string, action: string) => {
     setActionLoading(`${containerId}-${action}`);
     try {
-      const response = await fetch("http://localhost:8000/api/containers/action/", {
+      const response = await fetch("http://192.168.100.100:8000/api/containers/action/", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

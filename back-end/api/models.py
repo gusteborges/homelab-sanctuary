@@ -21,6 +21,7 @@ class Service(models.Model):
         ('GAMING', 'Gaming'),
         ('MONITORING', 'Monitoring'),
         ('MANAGEMENT', 'Management'),
+	('CODE', 'Code')
     ]
 
     name = models.CharField(max_length=100)

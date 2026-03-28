@@ -59,3 +59,13 @@ dist-ssr
 *.sln
 *.sw?
 >>>>>>> aae557d0500afd4ecb3148d455ef0f14fb2dd572
+
+
+# Ignorar volumes de dados do Docker Homelab
+*-config/
+*-data/
+*-cache/
+
+# Caso tenha banco de dados local do Django
+db.sqlite3
+__pycache__/

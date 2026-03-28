@@ -23,7 +23,7 @@ const ServicesPage = () => {
 useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/services/", {
+        const response = await fetch("http://192.168.100.100:8000/api/services/", {
           headers: { "Authorization": `Token ${token}` }
         });
         if (response.ok) {

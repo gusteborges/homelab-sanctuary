@@ -14,7 +14,7 @@ const RemoteAccessPage = () => {
   // Busca as máquinas reais cadastradas no seu Django
   const fetchMachines = async () => {
     try {
-      const response = await fetch("http://localhost:8000/api/remote-machines/", {
+      const response = await fetch("http://192.168.100.100:8000/api/remote-machines/", {
         headers: { "Authorization": `Token ${token}` }
       });
       if (response.ok) {
@@ -38,7 +38,7 @@ const RemoteAccessPage = () => {
   const handleWake = async (mac: string, name: string) => {
     setWaking(name);
     try {
-      const response = await fetch("http://localhost:8000/api/wake-on-lan/", {
+      const response = await fetch("http://192.168.100.100:8000/wake-on-lan/", {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
