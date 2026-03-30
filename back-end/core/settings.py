@@ -122,11 +122,11 @@ REST_FRAMEWORK = {
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'homelab',
-        'USER': 'admin',
-        'PASSWORD': 'sua_senha_segura', # A mesma que você colocou no docker-compose
-        'HOST': 'db', # Nome do serviço no docker-compose
-        'PORT': '5432',
+        'NAME': os.getenv("DB_NAME", "homelab"),
+        'USER': os.getenv("DB_USER", "admin"),
+        'PASSWORD': os.getenv("DB_PASSWORD", "sua_senha_segura"), 
+        'HOST': os.getenv("DB_HOST", "db"),
+        'PORT': os.getenv("DB_PORT", "5432"),
     }
 }
 
@@ -178,5 +178,5 @@ AUTH_USER_MODEL = 'api.User'
 
 
 PROXMOX_URL = os.getenv("PROXMOX_URL", "https://192.168.100.200:8006")
-PROXMOX_TOKEN_NAME = os.getenv("PROXMOX_TOKEN_NAME")
-PROXMOX_TOKEN_VALUE = os.getenv("PROXMOX_TOKEN_VALUE")
+PROXMOX_TOKEN_NAME = os.getenv("PROXMOX_TOKEN_ID")
+PROXMOX_TOKEN_VALUE = os.getenv("PROXMOX_TOKEN_SECRET")

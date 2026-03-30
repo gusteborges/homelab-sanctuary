@@ -47,3 +47,21 @@ class RemoteMachine(models.Model):
 
     def __str__(self):
         return self.name
+
+class Notification(models.Model):
+    LEVEL_CHOICES = (
+        ('info', 'Info'),
+        ('warning', 'Warning'),
+        ('error', 'Error'),
+    )
+    title = models.CharField(max_length=100)
+    message = models.TextField()
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='info')
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.level}: {self.title}"

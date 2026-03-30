@@ -51,9 +51,9 @@ services:
     volumes:
       - ./jellyfin-config:/config
       - ./jellyfin-cache:/cache
-      - /data/movies/filmes:/data/movies
-      - /data/movies/musicas:/data/music
-      - /data/movies/animes:/data/animes
+      - ./data/movies/filmes:/data/movies
+      - ./data/movies/musicas:/data/music
+      - ./data/movies/animes:/data/animes
     networks:
       - homelab-net
 
@@ -65,7 +65,8 @@ services:
      - "5000:5000"
    volumes:
      - ./kavita-config:/kavita/config
-     - /data/movies/books:/data
+     - ./data/movies/books:/data
+
    environment:
      - TZ=America/Sao_Paulo
      - PUID=1000
@@ -85,7 +86,7 @@ services:
       - "3000:3000"
       - "222:22"
     volumes:
-      - /root/homelab-sanctuary/gitea-data:/data
+      - ./gitea-data:/data
     networks:
       - homelab-net
 
@@ -96,11 +97,11 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=America/Sao_Paulo
-      - PASSWORD=9292
-      - SUDO_PASSWORD=9292
+      - PASSWORD=${CODE_SERVER_PASSWORD:-9292}
+      - SUDO_PASSWORD=${CODE_SERVER_SUDO_PASSWORD:-9292}
     volumes:
-      - /root/homelab-sanctuary/code-server-config:/config
-      - /root/homelab-sanctuary/code-server-workspace:/workspace # Aqui é onde seus códigos vão ficar salvos de verdade
+      - ./code-server-config:/config
+      - ./code-server-workspace:/workspace # Aqui é onde seus códigos vão ficar salvos de verdade
     ports:
       - "8443:8443"
       - "3001:3000"

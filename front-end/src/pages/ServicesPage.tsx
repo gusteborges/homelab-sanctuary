@@ -2,10 +2,10 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Activity, Monitor, Shield, Database, Layout } from "lucide-react";
+import { ExternalLink, Activity, Monitor, Shield, Database, Layout, Code } from "lucide-react";
 import StatusDot from "@/components/StatusDot";
+import { API_BASE_URL } from "@/lib/api";
 
-// Mapeamento de ícones para as categorias que você criou no Django
 const iconMap: Record<string, any> = {
   GAMING: Monitor,
   MEDIA: Activity,
@@ -13,6 +13,7 @@ const iconMap: Record<string, any> = {
   MONITORING: Activity,
   MANAGEMENT: Layout,
   NETWORK: Shield,
+  CODE: Code,
 };
 
 const ServicesPage = () => {
@@ -20,43 +21,39 @@ const ServicesPage = () => {
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
 
-useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const response = await fetch("http://192.168.100.100:8000/api/services/", {
-          headers: { "Authorization": `Token ${token}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setServices(data);
-        }
-      } catch (err) {
-        console.error("Erro ao buscar serviços:", err);
-      } finally {
-        setLoading(false);
+  const fetchServices = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/services/`, {
+        headers: { "Authorization": `Token ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setServices(data);
       }
-    };
+    } catch (err) {
+      console.error("Services fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    fetchServices(); // Chama imediatamente ao carregar
-    
-    // Define a frequência do PING (30000ms = 30 segundos)
+  useEffect(() => {
+    fetchServices();
     const interval = setInterval(fetchServices, 30000); 
-    
-    return () => clearInterval(interval); // Limpa o timer ao sair da página
+    return () => clearInterval(interval);
   }, [token]);
 
-  // Agrupar serviços por categoria para manter o visual organizado
   const categories = [...new Set(services.map((s: any) => s.category))];
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold font-mono text-foreground">Services</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your real homelab infrastructure</p>
+        <p className="text-sm text-muted-foreground mt-1">Manage your homelab infrastructure</p>
       </div>
 
-      {loading ? (
-        <p className="font-mono text-sm animate-pulse">Loading infrastructure...</p>
+      {loading && services.length === 0 ? (
+        <p className="font-mono text-sm animate-pulse">Scanning infrastructure...</p>
       ) : (
         categories.map((cat) => (
           <div key={cat} className="space-y-4">
@@ -92,7 +89,7 @@ useEffect(() => {
                           <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
                             service.is_active ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-muted border-border text-muted-foreground'
                           }`}>
-                            {service.is_active ? 'RUNNING' : 'STOPPED'}
+                            {service.is_active ? 'ONLINE' : 'OFFLINE'}
                           </span>
                           
                           <Button 

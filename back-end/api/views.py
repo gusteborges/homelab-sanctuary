@@ -4,19 +4,34 @@ import platform
 import psutil
 import docker
 import urllib3
+import socket
+from concurrent.futures import ThreadPoolExecutor
 
-from .models import RemoteMachine, Service
-from .serializers import RemoteMachineSerializer, UserSerializer
+from .models import RemoteMachine, Service, Notification
+from .serializers import RemoteMachineSerializer, UserSerializer, ServiceSerializer, NotificationSerializer
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import serializers
 from wakeonlan import send_magic_packet
 
-# Desabilita avisos de certificado SSL (comum no Proxmox)
+# Desabilita avisos de certificado SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+def check_port(host, port, timeout=1):
+    """Verifica se uma porta TCP está aberta."""
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except:
+        return False
+
+def check_ping(host):
+    """Verifica se um host responde ao ping."""
+    param = '-n' if platform.system().lower() == 'windows' else '-c'
+    command = f"ping {param} 1 {host}"
+    return os.system(command + " > /dev/null 2>&1") == 0
 
 class CustomAuthToken(ObtainAuthToken):
     def post(self, request, *args, **kwargs):
@@ -35,14 +50,11 @@ class SystemMonitorView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # 1. Tenta carregar as configurações do seu .env
-        # Note: Mudei o padrão para .70 para evitar o erro de rota do .200
         proxmox_url = os.getenv("PROXMOX_URL", "https://192.168.100.70:8006")
         token_id = os.getenv("PROXMOX_TOKEN_ID")
         token_secret = os.getenv("PROXMOX_TOKEN_SECRET")
         node_name = "guste"
 
-        # Valores de fallback (dados do container)
         cpu_usage = psutil.cpu_percent()
         ram = psutil.virtual_memory()
         ram_percent = ram.percent
@@ -51,41 +63,29 @@ class SystemMonitorView(APIView):
         hostname = platform.node()
         status = "online"
 
-        # 2. Se houver Token, busca dados REAIS do Hardware via API Proxmox
         if token_id and token_secret:
             try:
                 api_url = f"{proxmox_url}/api2/json/nodes/{node_name}/status"
                 headers = {"Authorization": f"PVEAPIToken={token_id}={token_secret}"}
-                
                 response = requests.get(api_url, headers=headers, verify=False, timeout=1.5)
                 
                 if response.status_code == 200:
                     data = response.json().get('data', {})
-                    # Dados do Notebook Real (Host)
                     cpu_usage = round(data.get('cpu', 0) * 100, 1)
                     ram_data = data.get('memory', {})
                     ram_percent = round((ram_data.get('used', 0) / ram_data.get('total', 1)) * 100, 1)
                     ram_total = round(ram_data.get('total', 0) / (1024**3), 1)
-                    
-                    # Dados de Disco do Notebook de 890GB
                     rootfs = data.get('rootfs', {})
                     disk_usage = round((rootfs.get('used', 0) / rootfs.get('total', 1)) * 100, 1)
                     hostname = f"{node_name} (Notebook)"
             except Exception as e:
-                print(f"Erro ao conectar na API do Proxmox: {e}")
                 status = "limited"
 
-        # 3. Lógica de Alertas Reais
-        alerts = []
-        if cpu_usage > 85:
-            alerts.append({"id": 1, "message": "Host com CPU elevada!", "level": "error"})
-        if ram_percent > 90:
-            alerts.append({"id": 2, "message": "RAM física quase esgotada!", "level": "warning"})
-        
-        # Bateria (O "Nobreak" do seu notebook)
-        battery = psutil.sensors_battery()
-        if battery and not battery.power_plugged and battery.percent < 20:
-            alerts.append({"id": 5, "message": "Bateria Fraca!", "level": "error"})
+        # Criar notificações reais se houver problemas
+        if cpu_usage > 90:
+            Notification.objects.get_or_create(title="Alta carga de CPU", message=f"O host {hostname} está com {cpu_usage}% de CPU.", level='error')
+        if ram_percent > 95:
+            Notification.objects.get_or_create(title="Memória Crítica", message=f"O host {hostname} está com {ram_percent}% de RAM.", level='error')
 
         return Response({
             "hostname": hostname,
@@ -93,38 +93,62 @@ class SystemMonitorView(APIView):
             "ram_percent": ram_percent,
             "ram_total": ram_total,
             "disk_percent": disk_usage,
-            "services_count": len(psutil.pids()),
-            "alerts": alerts,
-            "alerts_count": len(alerts),
-            "status": status
+            "status": status,
+            "alerts_count": Notification.objects.filter(is_read=False).count()
         })
-
-# --- Mantendo suas outras classes originais ---
-
-class ServiceSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Service
-        fields = '__all__'
 
 class ServiceListView(APIView):
     permission_classes = [IsAuthenticated]
+    
     def get(self, request):
         services = Service.objects.all()
         data = []
-        for service in services:
+        
+        def process_service(service):
             service_data = ServiceSerializer(service).data
-            host = service.url.split("//")[-1].split(":")[0].split("/")[0]
-            param = '-n' if platform.system().lower() == 'windows' else '-c'
-            command = f"ping {param} 1 {host}"
-            is_online = os.system(command) == 0
-            service_data['is_active'] = is_online
-            data.append(service_data)
+            try:
+                # Extrair host e porta da URL
+                from urllib.parse import urlparse
+                parsed = urlparse(service.url)
+                host = parsed.hostname
+                port = parsed.port
+                
+                if not port:
+                    port = 80 if parsed.scheme == 'http' else 443
+                
+                # Verifica porta TCP (muito mais preciso que ping)
+                is_online = check_port(host, port)
+                service_data['is_active'] = is_online
+                
+                # Se caiu, gera notificação
+                if not is_online:
+                    Notification.objects.get_or_create(
+                        title=f"Serviço Fora do Ar: {service.name}",
+                        message=f"Não foi possível conectar em {host}:{port}",
+                        level='error'
+                    )
+            except:
+                service_data['is_active'] = False
+            return service_data
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            data = list(executor.map(process_service, services))
+            
         return Response(data)
 
 class RemoteMachineListView(APIView):
     permission_classes = [IsAuthenticated]
+    
     def get(self, request):
         machines = RemoteMachine.objects.all()
+        
+        def process_machine(machine):
+            machine.is_online = check_ping(machine.ip_address)
+            return machine
+
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            machines = list(executor.map(process_machine, machines))
+            
         serializer = RemoteMachineSerializer(machines, many=True)
         return Response(serializer.data)
 
@@ -134,8 +158,21 @@ class WakeOnLanView(APIView):
         mac = request.data.get('mac_address')
         if mac:
             send_magic_packet(mac)
-            return Response({"message": "Magic packet sent!"})
+            return Response({"message": f"Magic packet sent to {mac}"})
         return Response({"error": "MAC required"}, status=400)
+
+class NotificationListView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        notifications = Notification.objects.all()[:50]
+        serializer = NotificationSerializer(notifications, many=True)
+        return Response(serializer.data)
+    
+    def post(self, request):
+        # Marcar todas como lidas
+        Notification.objects.filter(is_read=False).update(is_read=True)
+        return Response({"message": "All notifications marked as read"})
 
 class DockerMonitorView(APIView):
     permission_classes = [IsAuthenticated]
@@ -161,7 +198,7 @@ class DockerMonitorView(APIView):
                     "name": container.name,
                     "status": container.status,
                     "image": container.image.tags[0] if container.image.tags else "N/A",
-                    "cpu_percent": 0.0,
+                    "cpu_percent": 0.0, # CPU stats requerem 2 leituras consecutivas
                     "ram_percent": mem_percent,
                 })
             return Response(container_data)

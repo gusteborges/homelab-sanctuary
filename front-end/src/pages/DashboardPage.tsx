@@ -3,12 +3,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import StatusDot from "@/components/StatusDot";
 import UsageBar from "@/components/UsageBar";
+import { API_BASE_URL } from "@/lib/api";
 import { Activity, Layers, AlertTriangle, Cpu, HardDrive } from "lucide-react";
 
 const DashboardPage = () => {
   const { token } = useAuth();
   
-  // Estado único para todos os dados que vêm do Django
   const [data, setData] = useState({ 
     cpu: 0, 
     ram_percent: 0, 
@@ -16,15 +16,14 @@ const DashboardPage = () => {
     disk_percent: 0,
     services_count: 0,
     alerts_count: 0,
-    alerts: [],
-    hostname: "Carregando...",
+    hostname: "Loading...",
     status: "loading" 
   });
 
   useEffect(() => {
     const fetchAllData = async () => {
       try {
-        const response = await fetch("http://192.168.100.100:8000/api/monitor/", {
+        const response = await fetch(`${API_BASE_URL}/monitor/`, {
           headers: { "Authorization": `Token ${token}` }
         });
         if (response.ok) {
@@ -32,12 +31,12 @@ const DashboardPage = () => {
           setData(result);
         }
       } catch (err) {
-        console.error("Erro ao conectar com o Homelab Backend:", err);
+        console.error("Dashboard error:", err);
       }
     };
 
     fetchAllData();
-    const interval = setInterval(fetchAllData, 15000); // Atualiza tudo a cada 15s
+    const interval = setInterval(fetchAllData, 15000);
     return () => clearInterval(interval);
   }, [token]);
 
@@ -50,12 +49,11 @@ const DashboardPage = () => {
         </p>
       </div>
 
-      {/* Stats Grid - TOTALMENTE REAL AGORA */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Card className="glow-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Processador</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Processor</p>
               <p className="text-2xl font-mono font-bold mt-1">{data.cpu}%</p>
             </div>
             <div className="p-2 rounded-md bg-primary/10"><Cpu className="h-5 w-5 text-primary" /></div>
@@ -65,17 +63,17 @@ const DashboardPage = () => {
         <Card className="glow-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Processos (PIDs)</p>
-              <p className="text-2xl font-mono font-bold mt-1">{data.services_count}</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Disk Health</p>
+              <p className="text-2xl font-mono font-bold mt-1">{data.disk_percent}%</p>
             </div>
-            <div className="p-2 rounded-md bg-primary/10"><Layers className="h-5 w-5 text-primary" /></div>
+            <div className="p-2 rounded-md bg-primary/10"><HardDrive className="h-5 w-5 text-primary" /></div>
           </CardContent>
         </Card>
 
         <Card className="glow-card">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground uppercase tracking-wider">Alertas Ativos</p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Active Alerts</p>
               <p className={`text-2xl font-mono font-bold mt-1 ${data.alerts_count > 0 ? 'text-destructive' : ''}`}>
                 {data.alerts_count}
               </p>
@@ -87,22 +85,11 @@ const DashboardPage = () => {
         </Card>
       </div>
 
-      {/* Lista de Alertas Dinâmica */}
-      {data.alerts.length > 0 && (
-        <div className="grid gap-2">
-          {data.alerts.map((alert: any) => (
-            <div key={alert.id} className="p-3 border border-destructive/50 bg-destructive/5 rounded-md flex items-center gap-2 text-destructive text-sm font-mono">
-              <AlertTriangle className="h-4 w-4" /> {alert.message}
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="glow-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-mono flex items-center gap-2">
-              <Activity className="h-4 w-4 text-primary" /> Status do Sistema
+              <Activity className="h-4 w-4 text-primary" /> System Status
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -111,7 +98,7 @@ const DashboardPage = () => {
                 <StatusDot status={data.status === "online" ? "online" : "offline"} />
                 <div>
                   <p className="text-sm font-mono font-medium">{data.hostname}</p>
-                  <p className="text-xs text-muted-foreground">{data.ram_total}GB de RAM Detectados</p>
+                  <p className="text-xs text-muted-foreground">{data.ram_total}GB RAM detected</p>
                 </div>
               </div>
             </div>
@@ -121,13 +108,13 @@ const DashboardPage = () => {
         <Card className="glow-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-mono flex items-center gap-2">
-              <HardDrive className="h-4 w-4 text-primary" /> Recursos em Tempo Real
+              <Layers className="h-4 w-4 text-primary" /> Resource Usage
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <UsageBar value={data.cpu} label="CPU" />
-            <UsageBar value={data.ram_percent} label="Memória RAM" />
-            <UsageBar value={data.disk_percent} label="Disco Principal" />
+            <UsageBar value={data.ram_percent} label="RAM Memory" />
+            <UsageBar value={data.disk_percent} label="Storage" />
           </CardContent>
         </Card>
       </div>
